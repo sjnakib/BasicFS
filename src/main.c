@@ -12,12 +12,18 @@ static void usage(FILE *stream, const char *program)
 int main(int argc, char **argv)
 {
     const char *program = argc > 0 ? argv[0] : "vsfsck";
+    vsfs_image image;
 
     if (argc != 2) {
         usage(stderr, program);
         return 2;
     }
 
-    printf("vsfsck: would check %s\n", argv[1]);
+    if (image_load(&image, argv[1], 0) != 0) {
+        return 2;
+    }
+
+    printf("loaded %zu bytes from %s\n", image.size, argv[1]);
+    image_close(&image);
     return 0;
 }
