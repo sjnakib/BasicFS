@@ -1,3 +1,5 @@
+#include "vsfs.h"
+
 #include <stdio.h>
 
 static void usage(FILE *stream, const char *program)
