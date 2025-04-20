@@ -1,6 +1,7 @@
 #include "vsfs.h"
 
 #include <stdio.h>
+#include <string.h>
 
 static void usage(FILE *stream, const char *program)
 {
@@ -13,6 +14,8 @@ int main(int argc, char **argv)
 {
     const char *program = argc > 0 ? argv[0] : "vsfsck";
     vsfs_image image;
+    vsfs_check check;
+    int result;
 
     if (argc != 2) {
         usage(stderr, program);
@@ -23,7 +26,13 @@ int main(int argc, char **argv)
         return 2;
     }
 
-    printf("loaded %zu bytes from %s\n", image.size, argv[1]);
-    image_close(&image);
-    return 0;
+    check_init(&check, &image);
+    check_run(&check);
+
+    printf("VSFS check: %s\n\n", argv[1]);
+    report_print(&check);
+    result = check.issues.count == 0 ? 0 : 1;
+
+    check_free(&check);
+    return result;
 }
