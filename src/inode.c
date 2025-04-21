@@ -31,7 +31,16 @@ int inode_pointer_is_valid(uint32_t block)
 
 static void add_block_ref(vsfs_check *check, uint32_t block, uint32_t inode)
 {
-    if (block == 0 || !inode_pointer_is_valid(block)) {
+    if (block == 0) {
+        return;
+    }
+
+    if (!inode_pointer_is_valid(block)) {
+        issue_add(&check->issues, VSFS_ISSUE_BAD_BLOCK,
+                  "inode %u references block %u, outside the data range "
+                  "%u-%u",
+                  inode, block, (unsigned)VSFS_FIRST_DATA_BLOCK,
+                  (unsigned)(VSFS_TOTAL_BLOCKS - 1));
         return;
     }
 
