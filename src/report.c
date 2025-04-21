@@ -2,6 +2,14 @@
 
 #include <stdio.h>
 
+static const char *const section_names[VSFS_ISSUE_COUNT] = {
+    "Superblock",
+    "Inode bitmap",
+    "Data bitmap",
+    "Duplicate blocks",
+    "Bad blocks",
+};
+
 size_t report_issue_count(const vsfs_check *check, vsfs_issue_type type)
 {
     size_t count = 0;
@@ -18,15 +26,30 @@ size_t report_issue_count(const vsfs_check *check, vsfs_issue_type type)
 void report_print(const vsfs_check *check)
 {
     size_t index;
+    size_t total = check->issues.count;
+    int type;
 
-    if (check->issues.count == 0) {
+    for (type = 0; type < VSFS_ISSUE_COUNT; type++) {
+        size_t found = report_issue_count(check, (vsfs_issue_type)type);
+
+        printf("%s\n", section_names[type]);
+        if (found == 0) {
+            printf("  ok\n");
+        } else {
+            for (index = 0; index < check->issues.count; index++) {
+                const vsfs_issue *issue = &check->issues.items[index];
+
+                if (issue->type == (vsfs_issue_type)type) {
+                    printf("  error: %s\n", issue->message);
+                }
+            }
+        }
+        printf("\n");
+    }
+
+    if (total == 0) {
         printf("No issues found.\n");
-        return;
+    } else {
+        printf("%zu issue%s found.\n", total, total == 1 ? "" : "s");
     }
-
-    for (index = 0; index < check->issues.count; index++) {
-        printf("error: %s\n", check->issues.items[index].message);
-    }
-    printf("%zu issue%s found.\n", check->issues.count,
-           check->issues.count == 1 ? "" : "s");
 }
