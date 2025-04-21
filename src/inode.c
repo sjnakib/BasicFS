@@ -28,3 +28,27 @@ int inode_pointer_is_valid(uint32_t block)
 {
     return block >= VSFS_FIRST_DATA_BLOCK && block < VSFS_TOTAL_BLOCKS;
 }
+
+static void add_block_ref(vsfs_check *check, uint32_t block, uint32_t inode)
+{
+    if (block == 0 || !inode_pointer_is_valid(block)) {
+        return;
+    }
+
+    if (check->ref_count[block] == 0) {
+        check->first_inode[block] = (int16_t)inode;
+    }
+    if (check->ref_count[block] < UINT16_MAX) {
+        check->ref_count[block]++;
+    }
+}
+
+void inode_scan_refs(vsfs_check *check, uint32_t index,
+                     const vsfs_inode *inode)
+{
+    uint32_t slot;
+
+    for (slot = 0; slot < VSFS_DIRECT_POINTERS; slot++) {
+        add_block_ref(check, inode->direct[slot], index);
+    }
+}
