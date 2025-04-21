@@ -73,7 +73,45 @@ void check_free(vsfs_check *check)
     issues_free(&check->issues);
 }
 
+
+static void check_inode_bitmap(vsfs_check *check)
+{
+    const uint8_t *bitmap =
+        const_block_data(&check->image, VSFS_INODE_BITMAP_BLOCK);
+    uint32_t index;
+
+    for (index = 0; index < VSFS_INODE_COUNT; index++) {
+        vsfs_inode inode;
+        int valid;
+        int marked;
+
+        inode_read(&check->image, index, &inode);
+        valid = inode_is_valid(&inode);
+        marked = bitmap_get(bitmap, index);
+
+        if (valid && !marked) {
+            issue_add(&check->issues, VSFS_ISSUE_INODE_BITMAP,
+                      "inode %u is valid but not marked in the inode bitmap",
+                      index);
+        } else if (!valid && marked) {
+            issue_add(&check->issues, VSFS_ISSUE_INODE_BITMAP,
+                      "inode %u is marked in the inode bitmap but is not "
+                      "valid",
+                      index);
+        }
+    }
+
+    for (index = VSFS_INODE_COUNT; index < VSFS_BLOCK_SIZE * 8u; index++) {
+        if (bitmap_get(bitmap, index)) {
+            issue_add(&check->issues, VSFS_ISSUE_INODE_BITMAP,
+                      "inode bitmap bit %u is outside the valid range 0-%u",
+                      index, (unsigned)(VSFS_INODE_COUNT - 1));
+        }
+    }
+}
+
 void check_run(vsfs_check *check)
 {
     superblock_check(&check->superblock, &check->issues);
+    check_inode_bitmap(check);
 }
