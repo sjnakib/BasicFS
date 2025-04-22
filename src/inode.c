@@ -52,6 +52,23 @@ static void add_block_ref(vsfs_check *check, uint32_t block, uint32_t inode)
     }
 }
 
+static void scan_single_indirect(vsfs_check *check, uint32_t inode,
+                                 uint32_t block)
+{
+    const uint32_t *entries;
+    uint32_t index;
+
+    add_block_ref(check, block, inode);
+    if (!inode_pointer_is_valid(block)) {
+        return;
+    }
+
+    entries = (const uint32_t *)const_block_data(&check->image, block);
+    for (index = 0; index < VSFS_POINTERS_PER_BLOCK; index++) {
+        add_block_ref(check, entries[index], inode);
+    }
+}
+
 void inode_scan_refs(vsfs_check *check, uint32_t index,
                      const vsfs_inode *inode)
 {
@@ -59,5 +76,8 @@ void inode_scan_refs(vsfs_check *check, uint32_t index,
 
     for (slot = 0; slot < VSFS_DIRECT_POINTERS; slot++) {
         add_block_ref(check, inode->direct[slot], index);
+    }
+    if (inode->single_indirect != 0) {
+        scan_single_indirect(check, index, inode->single_indirect);
     }
 }
