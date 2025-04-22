@@ -22,6 +22,11 @@ int main(int argc, char **argv)
         return 2;
     }
 
+    if (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0) {
+        usage(stdout, program);
+        return 0;
+    }
+
     if (image_load(&image, argv[1], 0) != 0) {
         return 2;
     }

@@ -1,0 +1,169 @@
+#!/usr/bin/env python3
+"""Tests for the vsfsck command-line tool."""
+
+from __future__ import annotations
+
+import struct
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+BINARY = ROOT / "vsfsck"
+IMAGE_DIR = ROOT / "tests" / "images"
+
+BLOCK_SIZE = 4096
+TOTAL_BLOCKS = 64
+INODE_TABLE_BLOCK = 3
+INODE_SIZE = 256
+MAGIC = 0xD34D
+
+failures: list[str] = []
+passed = 0
+
+
+def run(*args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [str(BINARY), *args],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def expect(name: str, condition: bool, detail: str = "") -> None:
+    global passed
+
+    if condition:
+        passed += 1
+        print(f"PASS {name}")
+    else:
+        failures.append(f"{name}: {detail}")
+        print(f"FAIL {name}: {detail}")
+
+
+def blank_image() -> bytearray:
+    image = bytearray(BLOCK_SIZE * TOTAL_BLOCKS)
+    struct.pack_into(
+        "<H2x8I",
+        image,
+        0,
+        MAGIC,
+        BLOCK_SIZE,
+        TOTAL_BLOCKS,
+        1,
+        2,
+        INODE_TABLE_BLOCK,
+        8,
+        INODE_SIZE,
+        80,
+    )
+    return image
+
+
+def add_inode(image: bytearray, index: int, *, direct: list[int] | None = None) -> None:
+    offset = INODE_TABLE_BLOCK * BLOCK_SIZE + index * INODE_SIZE
+    direct_values = (direct or []) + [0] * (12 - len(direct or []))
+    used = sum(1 for value in direct_values if value)
+    struct.pack_into("<10I", image, offset, 0, 0, 0, 0, 0, 0, 0, 0, 1, used)
+    struct.pack_into("<15I", image, offset + 40, *direct_values, 0, 0, 0)
+
+
+def set_bit(image: bytearray, block: int, index: int) -> None:
+    image[block * BLOCK_SIZE + index // 8] |= 1 << (index % 8)
+
+
+def write_image(directory: Path, name: str, image: bytes | bytearray) -> Path:
+    path = directory / name
+    path.write_bytes(image)
+    return path
+
+
+def test_usage() -> None:
+    result = run()
+    expect(
+        "no arguments returns usage",
+        result.returncode == 2 and "Usage:" in result.stderr,
+        f"exit={result.returncode}",
+    )
+
+    result = run("--help")
+    expect(
+        "help exits cleanly",
+        result.returncode == 0 and "Usage:" in result.stdout,
+        f"exit={result.returncode}",
+    )
+
+
+def test_missing_and_truncated() -> None:
+    result = run("/tmp/vsfsck-image-that-does-not-exist")
+    expect(
+        "missing image is rejected",
+        result.returncode == 2 and "cannot open" in result.stderr,
+        f"exit={result.returncode}",
+    )
+
+    with tempfile.TemporaryDirectory() as directory:
+        path = write_image(Path(directory), "short.img", b"\0" * 100)
+        result = run(str(path))
+        expect(
+            "truncated image is rejected",
+            result.returncode == 2,
+            f"exit={result.returncode}",
+        )
+
+
+def test_superblock_error() -> None:
+    result = run(str(IMAGE_DIR / "set-04.img"))
+    expect(
+        "set-04 exit code",
+        result.returncode == 1,
+        f"exit={result.returncode}",
+    )
+    expect(
+        "set-04 reports bad magic",
+        "superblock magic is 0x3d4d, expected 0xd34d" in result.stdout,
+        result.stdout,
+    )
+
+
+def test_clean_image() -> None:
+    with tempfile.TemporaryDirectory() as directory:
+        clean = blank_image()
+        add_inode(clean, 0, direct=[8])
+        set_bit(clean, 1, 0)
+        set_bit(clean, 2, 8)
+        path = write_image(Path(directory), "clean.img", clean)
+
+        result = run(str(path))
+        expect(
+            "clean image passes",
+            result.returncode == 0 and "No issues found." in result.stdout,
+            result.stdout,
+        )
+
+
+def main() -> int:
+    if not BINARY.exists():
+        print(f"missing binary: {BINARY}", file=sys.stderr)
+        return 2
+
+    test_usage()
+    test_missing_and_truncated()
+    test_superblock_error()
+    test_clean_image()
+
+    print()
+    if failures:
+        print(f"{len(failures)} failed, {passed} passed")
+        for failure in failures:
+            print(f"  {failure}")
+        return 1
+
+    print(f"All {passed} checks passed.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

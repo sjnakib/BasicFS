@@ -17,7 +17,10 @@ build/%.o: src/%.c include/vsfs.h | build
 build:
 	mkdir -p build
 
+test: $(TARGET)
+	python3 tests/run_tests.py
+
 clean:
 	rm -rf build $(TARGET)
 
-.PHONY: all clean
+.PHONY: all test clean
