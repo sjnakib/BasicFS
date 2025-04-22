@@ -46,7 +46,16 @@ static void add_block_ref(vsfs_check *check, uint32_t block, uint32_t inode)
 
     if (check->ref_count[block] == 0) {
         check->first_inode[block] = (int16_t)inode;
+    } else if (check->first_inode[block] == (int16_t)inode) {
+        issue_add(&check->issues, VSFS_ISSUE_DUPLICATE,
+                  "inode %u references block %u more than once", inode,
+                  block);
+    } else {
+        issue_add(&check->issues, VSFS_ISSUE_DUPLICATE,
+                  "block %u is referenced by inode %d and inode %u", block,
+                  check->first_inode[block], inode);
     }
+
     if (check->ref_count[block] < UINT16_MAX) {
         check->ref_count[block]++;
     }
