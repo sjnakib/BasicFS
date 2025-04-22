@@ -52,8 +52,8 @@ static void add_block_ref(vsfs_check *check, uint32_t block, uint32_t inode)
     }
 }
 
-static void scan_single_indirect(vsfs_check *check, uint32_t inode,
-                                 uint32_t block)
+static void scan_indirect(vsfs_check *check, uint32_t inode, uint32_t block,
+                          int depth)
 {
     const uint32_t *entries;
     uint32_t index;
@@ -65,7 +65,16 @@ static void scan_single_indirect(vsfs_check *check, uint32_t inode,
 
     entries = (const uint32_t *)const_block_data(&check->image, block);
     for (index = 0; index < VSFS_POINTERS_PER_BLOCK; index++) {
-        add_block_ref(check, entries[index], inode);
+        uint32_t child = entries[index];
+
+        if (child == 0) {
+            continue;
+        }
+        if (depth == 1) {
+            add_block_ref(check, child, inode);
+        } else {
+            scan_indirect(check, inode, child, depth - 1);
+        }
     }
 }
 
@@ -78,6 +87,12 @@ void inode_scan_refs(vsfs_check *check, uint32_t index,
         add_block_ref(check, inode->direct[slot], index);
     }
     if (inode->single_indirect != 0) {
-        scan_single_indirect(check, index, inode->single_indirect);
+        scan_indirect(check, index, inode->single_indirect, 1);
+    }
+    if (inode->double_indirect != 0) {
+        scan_indirect(check, index, inode->double_indirect, 2);
+    }
+    if (inode->triple_indirect != 0) {
+        scan_indirect(check, index, inode->triple_indirect, 3);
     }
 }
