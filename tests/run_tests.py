@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import shutil
 import struct
 import subprocess
 import sys
@@ -367,6 +368,25 @@ def test_synthetic_blocks() -> None:
         )
 
 
+def test_superblock_repair() -> None:
+    with tempfile.TemporaryDirectory() as directory:
+        target = Path(directory) / "set-04.img"
+        shutil.copy2(IMAGE_DIR / "set-04.img", target)
+
+        fixed = run("--fix", str(target))
+        expect(
+            "superblock repair exits cleanly",
+            fixed.returncode == 0,
+            f"exit={fixed.returncode}",
+        )
+        recheck = run(str(target))
+        expect(
+            "superblock repair is clean on recheck",
+            recheck.returncode == 0 and "No issues found." in recheck.stdout,
+            recheck.stdout,
+        )
+
+
 def main() -> int:
     if not BINARY.exists():
         print(f"missing binary: {BINARY}", file=sys.stderr)
@@ -377,6 +397,7 @@ def main() -> int:
     test_provided_images()
     test_clean_image()
     test_synthetic_blocks()
+    test_superblock_repair()
 
     print()
     if failures:
