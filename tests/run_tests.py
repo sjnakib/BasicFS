@@ -19,6 +19,76 @@ INODE_TABLE_BLOCK = 3
 INODE_SIZE = 256
 MAGIC = 0xD34D
 
+PROVIDED_CASES = {
+    "set-01.img": (
+        2,
+        [
+            "inode 0 is valid but not marked in the inode bitmap",
+            "inode 0 references block 80",
+        ],
+    ),
+    "set-02.img": (
+        5,
+        [
+            "inode 10 is valid but not marked in the inode bitmap",
+            "inode 28 is marked in the inode bitmap but is not valid",
+            "inode 31 is marked in the inode bitmap but is not valid",
+        ],
+    ),
+    "set-03.img": (
+        2,
+        [
+            "inode 13 is marked in the inode bitmap but is not valid",
+            "data block 13 is marked in the data bitmap but not referenced",
+        ],
+    ),
+    "set-08.img": (
+        8,
+        [
+            "inode 8 is marked in the inode bitmap but is not valid",
+            "data block 8 is marked in the data bitmap but not referenced",
+            "data block 26 is marked in the data bitmap but not referenced",
+        ],
+    ),
+    "set-09.img": (
+        5,
+        [
+            "data block 40 is marked in the data bitmap but not referenced",
+            "data bitmap marks block 64, outside the data range 8-63",
+            "data bitmap marks block 66, outside the data range 8-63",
+        ],
+    ),
+    "set-10.img": (
+        4,
+        [
+            "inode 65 is marked in the inode bitmap but is not valid",
+            "inode 74 is marked in the inode bitmap but is not valid",
+        ],
+    ),
+    "set-12.img": (
+        3,
+        [
+            "inode 72 is marked in the inode bitmap but is not valid",
+            "inode 74 is marked in the inode bitmap but is not valid",
+        ],
+    ),
+    "set-13.img": (
+        4,
+        [
+            "data block 8 is marked in the data bitmap but not referenced",
+            "data block 14 is marked in the data bitmap but not referenced",
+        ],
+    ),
+    "set-14.img": (
+        16,
+        [
+            "inode 25 is marked in the inode bitmap but is not valid",
+            "inode bitmap bit 88 is outside the valid range 0-79",
+            "inode bitmap bit 318 is outside the valid range 0-79",
+        ],
+    ),
+}
+
 failures: list[str] = []
 passed = 0
 
@@ -144,6 +214,28 @@ def test_clean_image() -> None:
         )
 
 
+
+def test_provided_images() -> None:
+    for name, (count, snippets) in PROVIDED_CASES.items():
+        path = IMAGE_DIR / name
+        result = run(str(path))
+        expect(
+            f"{name} exit code",
+            result.returncode == 1,
+            f"exit={result.returncode}",
+        )
+        expect(
+            f"{name} issue count",
+            f"{count} issues found." in result.stdout,
+            result.stdout,
+        )
+        for snippet in snippets:
+            expect(
+                f"{name} reports {snippet!r}",
+                snippet in result.stdout,
+                result.stdout,
+            )
+
 def main() -> int:
     if not BINARY.exists():
         print(f"missing binary: {BINARY}", file=sys.stderr)
@@ -152,6 +244,7 @@ def main() -> int:
     test_usage()
     test_missing_and_truncated()
     test_superblock_error()
+    test_provided_images()
     test_clean_image()
 
     print()
