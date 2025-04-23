@@ -169,12 +169,26 @@ def blank_image() -> bytearray:
     return image
 
 
-def add_inode(image: bytearray, index: int, *, direct: list[int] | None = None) -> None:
+def add_inode(
+    image: bytearray,
+    index: int,
+    *,
+    direct: list[int] | None = None,
+    single: int = 0,
+    double: int = 0,
+    triple: int = 0,
+    links: int = 1,
+    dtime: int = 0,
+) -> None:
     offset = INODE_TABLE_BLOCK * BLOCK_SIZE + index * INODE_SIZE
     direct_values = (direct or []) + [0] * (12 - len(direct or []))
     used = sum(1 for value in direct_values if value)
-    struct.pack_into("<10I", image, offset, 0, 0, 0, 0, 0, 0, 0, 0, 1, used)
-    struct.pack_into("<15I", image, offset + 40, *direct_values, 0, 0, 0)
+    struct.pack_into(
+        "<10I", image, offset, 0, 0, 0, 0, 0, 0, 0, dtime, links, used
+    )
+    struct.pack_into(
+        "<15I", image, offset + 40, *direct_values, single, double, triple
+    )
 
 
 def set_bit(image: bytearray, block: int, index: int) -> None:
@@ -185,6 +199,13 @@ def write_image(directory: Path, name: str, image: bytes | bytearray) -> Path:
     path = directory / name
     path.write_bytes(image)
     return path
+
+def write_u32(image: bytearray, block: int, index: int, value: int) -> None:
+    struct.pack_into("<I", image, block * BLOCK_SIZE + index * 4, value)
+
+
+def read_u32(image: bytes, block: int, index: int) -> int:
+    return struct.unpack_from("<I", image, block * BLOCK_SIZE + index * 4)[0]
 
 
 def test_usage() -> None:
@@ -258,6 +279,94 @@ def test_clean_image() -> None:
         )
 
 
+def test_synthetic_blocks() -> None:
+    with tempfile.TemporaryDirectory() as directory:
+        work = Path(directory)
+
+        duplicate = blank_image()
+        add_inode(duplicate, 0, direct=[8])
+        add_inode(duplicate, 1, direct=[8])
+        set_bit(duplicate, 1, 0)
+        set_bit(duplicate, 1, 1)
+        set_bit(duplicate, 2, 8)
+        path = write_image(work, "duplicate.img", duplicate)
+        result = run(str(path))
+        expect(
+            "duplicate block is reported",
+            result.returncode == 1
+            and "block 8 is referenced by inode 0 and inode 1" in result.stdout,
+            result.stdout,
+        )
+
+        bad_block = blank_image()
+        add_inode(bad_block, 0, direct=[80])
+        set_bit(bad_block, 1, 0)
+        path = write_image(work, "bad-block.img", bad_block)
+        result = run(str(path))
+        expect(
+            "bad block is reported",
+            result.returncode == 1
+            and "inode 0 references block 80" in result.stdout,
+            result.stdout,
+        )
+
+        indirect = blank_image()
+        add_inode(indirect, 0, single=8)
+        write_u32(indirect, 8, 0, 9)
+        set_bit(indirect, 1, 0)
+        set_bit(indirect, 2, 8)
+        set_bit(indirect, 2, 9)
+        path = write_image(work, "indirect.img", indirect)
+        expect(
+            "single indirect blocks are followed",
+            run(str(path)).returncode == 0,
+            "indirect image reported an issue",
+        )
+
+        double = blank_image()
+        add_inode(double, 0, double=8)
+        write_u32(double, 8, 0, 9)
+        write_u32(double, 9, 0, 10)
+        set_bit(double, 1, 0)
+        for block in (8, 9, 10):
+            set_bit(double, 2, block)
+        path = write_image(work, "double.img", double)
+        expect(
+            "double indirect blocks are followed",
+            run(str(path)).returncode == 0,
+            "double indirect image reported an issue",
+        )
+
+        triple = blank_image()
+        add_inode(triple, 0, triple=8)
+        write_u32(triple, 8, 0, 9)
+        write_u32(triple, 9, 0, 10)
+        write_u32(triple, 10, 0, 11)
+        set_bit(triple, 1, 0)
+        for block in (8, 9, 10, 11):
+            set_bit(triple, 2, block)
+        path = write_image(work, "triple.img", triple)
+        expect(
+            "triple indirect blocks are followed",
+            run(str(path)).returncode == 0,
+            "triple indirect image reported an issue",
+        )
+
+        bad_indirect = blank_image()
+        add_inode(bad_indirect, 0, single=8)
+        write_u32(bad_indirect, 8, 0, 80)
+        set_bit(bad_indirect, 1, 0)
+        set_bit(bad_indirect, 2, 8)
+        path = write_image(work, "bad-indirect.img", bad_indirect)
+        result = run(str(path))
+        expect(
+            "bad indirect entry is reported",
+            result.returncode == 1
+            and "inode 0 references block 80" in result.stdout,
+            result.stdout,
+        )
+
+
 def main() -> int:
     if not BINARY.exists():
         print(f"missing binary: {BINARY}", file=sys.stderr)
@@ -267,6 +376,7 @@ def main() -> int:
     test_missing_and_truncated()
     test_provided_images()
     test_clean_image()
+    test_synthetic_blocks()
 
     print()
     if failures:
