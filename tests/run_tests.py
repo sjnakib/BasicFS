@@ -42,6 +42,34 @@ PROVIDED_CASES = {
             "data block 13 is marked in the data bitmap but not referenced",
         ],
     ),
+    "set-04.img": (
+        2,
+        [
+            "superblock magic is 0x3d4d, expected 0xd34d",
+            "superblock first data block is 160, expected 8",
+        ],
+    ),
+    "set-05.img": (
+        2,
+        [
+            "superblock magic is 0xd39d, expected 0xd34d",
+            "superblock inode table block is 160, expected 3",
+        ],
+    ),
+    "set-06.img": (
+        2,
+        [
+            "superblock inode table block is 160, expected 3",
+            "superblock inode count is 96, expected 80",
+        ],
+    ),
+    "set-07.img": (
+        2,
+        [
+            "superblock total blocks is 80, expected 64",
+            "superblock inode count is 96, expected 80",
+        ],
+    ),
     "set-08.img": (
         8,
         [
@@ -63,6 +91,15 @@ PROVIDED_CASES = {
         [
             "inode 65 is marked in the inode bitmap but is not valid",
             "inode 74 is marked in the inode bitmap but is not valid",
+        ],
+    ),
+    "set-11.img": (
+        12,
+        [
+            "superblock block size is 1048628, expected 4096",
+            "superblock inode count is 20480, expected 80",
+            "data bitmap marks block 1, outside the data range 8-63",
+            "data bitmap marks block 6, outside the data range 8-63",
         ],
     ),
     "set-12.img": (
@@ -184,37 +221,6 @@ def test_missing_and_truncated() -> None:
         )
 
 
-def test_superblock_error() -> None:
-    result = run(str(IMAGE_DIR / "set-04.img"))
-    expect(
-        "set-04 exit code",
-        result.returncode == 1,
-        f"exit={result.returncode}",
-    )
-    expect(
-        "set-04 reports bad magic",
-        "superblock magic is 0x3d4d, expected 0xd34d" in result.stdout,
-        result.stdout,
-    )
-
-
-def test_clean_image() -> None:
-    with tempfile.TemporaryDirectory() as directory:
-        clean = blank_image()
-        add_inode(clean, 0, direct=[8])
-        set_bit(clean, 1, 0)
-        set_bit(clean, 2, 8)
-        path = write_image(Path(directory), "clean.img", clean)
-
-        result = run(str(path))
-        expect(
-            "clean image passes",
-            result.returncode == 0 and "No issues found." in result.stdout,
-            result.stdout,
-        )
-
-
-
 def test_provided_images() -> None:
     for name, (count, snippets) in PROVIDED_CASES.items():
         path = IMAGE_DIR / name
@@ -236,6 +242,22 @@ def test_provided_images() -> None:
                 result.stdout,
             )
 
+def test_clean_image() -> None:
+    with tempfile.TemporaryDirectory() as directory:
+        clean = blank_image()
+        add_inode(clean, 0, direct=[8])
+        set_bit(clean, 1, 0)
+        set_bit(clean, 2, 8)
+        path = write_image(Path(directory), "clean.img", clean)
+
+        result = run(str(path))
+        expect(
+            "clean image passes",
+            result.returncode == 0 and "No issues found." in result.stdout,
+            result.stdout,
+        )
+
+
 def main() -> int:
     if not BINARY.exists():
         print(f"missing binary: {BINARY}", file=sys.stderr)
@@ -243,7 +265,6 @@ def main() -> int:
 
     test_usage()
     test_missing_and_truncated()
-    test_superblock_error()
     test_provided_images()
     test_clean_image()
 

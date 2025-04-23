@@ -14,7 +14,6 @@ void superblock_check(const vsfs_superblock *superblock, vsfs_issues *issues)
         issue_add(issues, VSFS_ISSUE_SUPERBLOCK,
                   "superblock magic is 0x%04x, expected 0xd34d",
                   superblock->magic);
-        return;
     }
     if (superblock->block_size != VSFS_BLOCK_SIZE) {
         issue_add(issues, VSFS_ISSUE_SUPERBLOCK,
