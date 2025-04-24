@@ -435,6 +435,61 @@ def test_data_bitmap_repair() -> None:
             )
 
 
+def test_pointer_repair() -> None:
+    with tempfile.TemporaryDirectory() as directory:
+        target = Path(directory) / "set-01.img"
+        shutil.copy2(IMAGE_DIR / "set-01.img", target)
+
+        fixed = run("--fix", str(target))
+        recheck = run(str(target))
+        expect(
+            "set-01 pointer repair exits cleanly",
+            fixed.returncode == 0,
+            f"exit={fixed.returncode}",
+        )
+        expect(
+            "set-01 is clean after pointer repair",
+            recheck.returncode == 0 and "No issues found." in recheck.stdout,
+            recheck.stdout,
+        )
+
+        bad_block = blank_image()
+        add_inode(bad_block, 0, direct=[80])
+        set_bit(bad_block, 1, 0)
+        bad_path = write_image(Path(directory), "bad-block.img", bad_block)
+        fixed = run("--fix", str(bad_path))
+        expect(
+            "bad block repair clears the pointer",
+            fixed.returncode == 0
+            and read_u32(bad_path.read_bytes(), INODE_TABLE_BLOCK, 10) == 0,
+            fixed.stdout,
+        )
+        expect(
+            "bad block image is clean after repair",
+            run(str(bad_path)).returncode == 0,
+            "recheck failed",
+        )
+
+        bad_indirect = blank_image()
+        add_inode(bad_indirect, 0, single=8)
+        write_u32(bad_indirect, 8, 0, 80)
+        set_bit(bad_indirect, 1, 0)
+        set_bit(bad_indirect, 2, 8)
+        bad_path = write_image(Path(directory), "bad-indirect.img", bad_indirect)
+        fixed = run("--fix", str(bad_path))
+        expect(
+            "bad indirect entry is cleared",
+            fixed.returncode == 0
+            and read_u32(bad_path.read_bytes(), 8, 0) == 0,
+            fixed.stdout,
+        )
+        expect(
+            "bad indirect image is clean after repair",
+            run(str(bad_path)).returncode == 0,
+            "recheck failed",
+        )
+
+
 def main() -> int:
     if not BINARY.exists():
         print(f"missing binary: {BINARY}", file=sys.stderr)
@@ -448,6 +503,7 @@ def main() -> int:
     test_superblock_repair()
     test_inode_bitmap_repair()
     test_data_bitmap_repair()
+    test_pointer_repair()
 
     print()
     if failures:
