@@ -408,6 +408,33 @@ def test_inode_bitmap_repair() -> None:
             )
 
 
+def test_data_bitmap_repair() -> None:
+    for name in (
+        "set-03.img",
+        "set-08.img",
+        "set-09.img",
+        "set-11.img",
+        "set-13.img",
+    ):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / name
+            shutil.copy2(IMAGE_DIR / name, target)
+
+            fixed = run("--fix", str(target))
+            recheck = run(str(target))
+            expect(
+                f"{name} data bitmap repair exits cleanly",
+                fixed.returncode == 0,
+                f"exit={fixed.returncode}",
+            )
+            expect(
+                f"{name} is clean after data bitmap repair",
+                recheck.returncode == 0
+                and "No issues found." in recheck.stdout,
+                recheck.stdout,
+            )
+
+
 def main() -> int:
     if not BINARY.exists():
         print(f"missing binary: {BINARY}", file=sys.stderr)
@@ -420,6 +447,7 @@ def main() -> int:
     test_synthetic_blocks()
     test_superblock_repair()
     test_inode_bitmap_repair()
+    test_data_bitmap_repair()
 
     print()
     if failures:
