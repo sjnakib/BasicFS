@@ -490,6 +490,35 @@ def test_pointer_repair() -> None:
         )
 
 
+def test_duplicate_repair() -> None:
+    with tempfile.TemporaryDirectory() as directory:
+        duplicate = blank_image()
+        add_inode(duplicate, 0, direct=[8])
+        add_inode(duplicate, 1, direct=[8])
+        set_bit(duplicate, 1, 0)
+        set_bit(duplicate, 1, 1)
+        set_bit(duplicate, 2, 8)
+        target = write_image(Path(directory), "duplicate.img", duplicate)
+
+        fixed = run("--fix", str(target))
+        expect(
+            "duplicate repair exits cleanly",
+            fixed.returncode == 0,
+            f"exit={fixed.returncode}",
+        )
+        expect(
+            "duplicate repair clears the later pointer",
+            read_u32(target.read_bytes(), INODE_TABLE_BLOCK, 1 * 64 + 10) == 0,
+            "inode 1 still points at block 8",
+        )
+        recheck = run(str(target))
+        expect(
+            "duplicate image is clean after repair",
+            recheck.returncode == 0 and "No issues found." in recheck.stdout,
+            recheck.stdout,
+        )
+
+
 def main() -> int:
     if not BINARY.exists():
         print(f"missing binary: {BINARY}", file=sys.stderr)
@@ -504,6 +533,7 @@ def main() -> int:
     test_inode_bitmap_repair()
     test_data_bitmap_repair()
     test_pointer_repair()
+    test_duplicate_repair()
 
     print()
     if failures:

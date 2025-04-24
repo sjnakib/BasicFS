@@ -1,5 +1,15 @@
 #include "vsfs.h"
 
+#include <string.h>
+
+static int claim_block(vsfs_check *check, uint32_t block)
+{
+    if (!inode_pointer_is_valid(block) || check->claimed[block]) {
+        return 0;
+    }
+    check->claimed[block] = 1;
+    return 1;
+}
 
 static void rebuild_inode_bitmap(vsfs_check *check)
 {
@@ -17,7 +27,6 @@ static void rebuild_inode_bitmap(vsfs_check *check)
     }
 }
 
-
 static void rebuild_data_bitmap(vsfs_check *check)
 {
     uint8_t *bitmap = block_data(&check->image, VSFS_DATA_BITMAP_BLOCK);
@@ -25,14 +34,13 @@ static void rebuild_data_bitmap(vsfs_check *check)
 
     bitmap_clear_all(bitmap);
     for (block = VSFS_FIRST_DATA_BLOCK; block < VSFS_TOTAL_BLOCKS; block++) {
-        if (check->ref_count[block] > 0) {
+        if (check->claimed[block]) {
             bitmap_set(bitmap, block, 1);
         }
     }
 }
 
-
-static void repair_bad_indirect(vsfs_check *check, uint32_t *pointer, int depth)
+static void repair_indirect(vsfs_check *check, uint32_t *pointer, int depth)
 {
     uint32_t block = *pointer;
     uint32_t *entries;
@@ -41,7 +49,8 @@ static void repair_bad_indirect(vsfs_check *check, uint32_t *pointer, int depth)
     if (block == 0) {
         return;
     }
-    if (!inode_pointer_is_valid(block)) {
+
+    if (!claim_block(check, block)) {
         *pointer = 0;
         return;
     }
@@ -54,11 +63,11 @@ static void repair_bad_indirect(vsfs_check *check, uint32_t *pointer, int depth)
             continue;
         }
         if (depth == 1) {
-            if (!inode_pointer_is_valid(child)) {
+            if (!claim_block(check, child)) {
                 entries[index] = 0;
             }
         } else {
-            repair_bad_indirect(check, &entries[index], depth - 1);
+            repair_indirect(check, &entries[index], depth - 1);
         }
     }
 }
@@ -66,6 +75,8 @@ static void repair_bad_indirect(vsfs_check *check, uint32_t *pointer, int depth)
 static void repair_inodes(vsfs_check *check)
 {
     uint32_t index;
+
+    memset(check->claimed, 0, sizeof(check->claimed));
 
     for (index = 0; index < VSFS_INODE_COUNT; index++) {
         vsfs_inode inode;
@@ -78,14 +89,14 @@ static void repair_inodes(vsfs_check *check)
 
         for (slot = 0; slot < VSFS_DIRECT_POINTERS; slot++) {
             if (inode.direct[slot] != 0 &&
-                !inode_pointer_is_valid(inode.direct[slot])) {
+                !claim_block(check, inode.direct[slot])) {
                 inode.direct[slot] = 0;
             }
         }
 
-        repair_bad_indirect(check, &inode.single_indirect, 1);
-        repair_bad_indirect(check, &inode.double_indirect, 2);
-        repair_bad_indirect(check, &inode.triple_indirect, 3);
+        repair_indirect(check, &inode.single_indirect, 1);
+        repair_indirect(check, &inode.double_indirect, 2);
+        repair_indirect(check, &inode.triple_indirect, 3);
 
         inode_write(&check->image, index, &inode);
     }
