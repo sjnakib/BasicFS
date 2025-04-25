@@ -280,6 +280,16 @@ def test_clean_image() -> None:
             result.stdout,
         )
 
+        trailing = write_image(
+            Path(directory), "trailing.img", bytes(clean) + b"\0" * 6 + b"junk"
+        )
+        result = run(str(trailing))
+        expect(
+            "trailing bytes are ignored",
+            result.returncode == 0 and "No issues found." in result.stdout,
+            result.stdout,
+        )
+
 
 def test_synthetic_blocks() -> None:
     with tempfile.TemporaryDirectory() as directory:
