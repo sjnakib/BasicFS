@@ -2,12 +2,13 @@
 
 #include <string.h>
 
-static int claim_block(vsfs_check *check, uint32_t block)
+static int claim_block(vsfs_check *check, uint32_t block, uint32_t *count)
 {
     if (!inode_pointer_is_valid(block) || check->claimed[block]) {
         return 0;
     }
     check->claimed[block] = 1;
+    (*count)++;
     return 1;
 }
 
@@ -40,7 +41,8 @@ static void rebuild_data_bitmap(vsfs_check *check)
     }
 }
 
-static void repair_indirect(vsfs_check *check, uint32_t *pointer, int depth)
+static void repair_indirect(vsfs_check *check, uint32_t *pointer, int depth,
+                            uint32_t *count)
 {
     uint32_t block = *pointer;
     uint32_t *entries;
@@ -50,7 +52,7 @@ static void repair_indirect(vsfs_check *check, uint32_t *pointer, int depth)
         return;
     }
 
-    if (!claim_block(check, block)) {
+    if (!claim_block(check, block, count)) {
         *pointer = 0;
         return;
     }
@@ -63,11 +65,11 @@ static void repair_indirect(vsfs_check *check, uint32_t *pointer, int depth)
             continue;
         }
         if (depth == 1) {
-            if (!claim_block(check, child)) {
+            if (!claim_block(check, child, count)) {
                 entries[index] = 0;
             }
         } else {
-            repair_indirect(check, &entries[index], depth - 1);
+            repair_indirect(check, &entries[index], depth - 1, count);
         }
     }
 }
@@ -80,6 +82,7 @@ static void repair_inodes(vsfs_check *check)
 
     for (index = 0; index < VSFS_INODE_COUNT; index++) {
         vsfs_inode inode;
+        uint32_t count = 0;
         uint32_t slot;
 
         inode_read(&check->image, index, &inode);
@@ -89,15 +92,16 @@ static void repair_inodes(vsfs_check *check)
 
         for (slot = 0; slot < VSFS_DIRECT_POINTERS; slot++) {
             if (inode.direct[slot] != 0 &&
-                !claim_block(check, inode.direct[slot])) {
+                !claim_block(check, inode.direct[slot], &count)) {
                 inode.direct[slot] = 0;
             }
         }
 
-        repair_indirect(check, &inode.single_indirect, 1);
-        repair_indirect(check, &inode.double_indirect, 2);
-        repair_indirect(check, &inode.triple_indirect, 3);
+        repair_indirect(check, &inode.single_indirect, 1, &count);
+        repair_indirect(check, &inode.double_indirect, 2, &count);
+        repair_indirect(check, &inode.triple_indirect, 3, &count);
 
+        inode.blocks = count;
         inode_write(&check->image, index, &inode);
     }
 }

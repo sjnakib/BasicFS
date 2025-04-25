@@ -465,6 +465,11 @@ def test_pointer_repair() -> None:
             fixed.stdout,
         )
         expect(
+            "bad block repair clears the block count",
+            read_u32(bad_path.read_bytes(), INODE_TABLE_BLOCK, 9) == 0,
+            "inode 0 still counts a block",
+        )
+        expect(
             "bad block image is clean after repair",
             run(str(bad_path)).returncode == 0,
             "recheck failed",
@@ -510,6 +515,11 @@ def test_duplicate_repair() -> None:
             "duplicate repair clears the later pointer",
             read_u32(target.read_bytes(), INODE_TABLE_BLOCK, 1 * 64 + 10) == 0,
             "inode 1 still points at block 8",
+        )
+        expect(
+            "duplicate repair clears the block count",
+            read_u32(target.read_bytes(), INODE_TABLE_BLOCK, 1 * 64 + 9) == 0,
+            "inode 1 still counts a block",
         )
         recheck = run(str(target))
         expect(
