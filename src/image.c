@@ -34,6 +34,14 @@ int image_load(vsfs_image *image, const char *path, int writable)
         return -1;
     }
 
+    if ((size_t)size < VSFS_IMAGE_SIZE) {
+        fprintf(stderr,
+                "vsfsck: %s is too small: %ld bytes, need at least %u\n",
+                path, size, (unsigned)VSFS_IMAGE_SIZE);
+        fclose(file);
+        return -1;
+    }
+
     data = malloc(VSFS_IMAGE_SIZE);
     if (data == NULL) {
         fprintf(stderr, "vsfsck: out of memory\n");

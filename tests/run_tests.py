@@ -239,7 +239,7 @@ def test_missing_and_truncated() -> None:
         result = run(str(path))
         expect(
             "truncated image is rejected",
-            result.returncode == 2,
+            result.returncode == 2 and "too small" in result.stderr,
             f"exit={result.returncode}",
         )
 
