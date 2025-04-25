@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import shutil
 import struct
 import subprocess
@@ -529,6 +530,34 @@ def test_duplicate_repair() -> None:
         )
 
 
+def test_repair_all_provided() -> None:
+    with tempfile.TemporaryDirectory() as directory:
+        work = Path(directory)
+        for name in PROVIDED_CASES:
+            source = IMAGE_DIR / name
+            target = work / name
+            shutil.copy2(source, target)
+
+            source_hash = hashlib.sha256(source.read_bytes()).hexdigest()
+            fixed = run("--fix", str(target))
+            expect(
+                f"{name} full repair exits cleanly",
+                fixed.returncode == 0,
+                f"exit={fixed.returncode}",
+            )
+            recheck = run(str(target))
+            expect(
+                f"{name} is clean after full repair",
+                recheck.returncode == 0 and "No issues found." in recheck.stdout,
+                recheck.stdout,
+            )
+            expect(
+                f"{name} source image is unchanged",
+                hashlib.sha256(source.read_bytes()).hexdigest() == source_hash,
+                "a test modified the source image",
+            )
+
+
 def main() -> int:
     if not BINARY.exists():
         print(f"missing binary: {BINARY}", file=sys.stderr)
@@ -544,6 +573,7 @@ def main() -> int:
     test_data_bitmap_repair()
     test_pointer_repair()
     test_duplicate_repair()
+    test_repair_all_provided()
 
     print()
     if failures:
