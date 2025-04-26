@@ -491,7 +491,9 @@ def test_pointer_repair() -> None:
         write_u32(bad_indirect, 8, 0, 80)
         set_bit(bad_indirect, 1, 0)
         set_bit(bad_indirect, 2, 8)
-        bad_path = write_image(Path(directory), "bad-indirect.img", bad_indirect)
+        bad_path = write_image(
+            Path(directory), "bad-indirect.img", bad_indirect
+        )
         fixed = run("--fix", str(bad_path))
         expect(
             "bad indirect entry is cleared",
@@ -558,7 +560,8 @@ def test_repair_all_provided() -> None:
             recheck = run(str(target))
             expect(
                 f"{name} is clean after full repair",
-                recheck.returncode == 0 and "No issues found." in recheck.stdout,
+                recheck.returncode == 0
+                and "No issues found." in recheck.stdout,
                 recheck.stdout,
             )
             expect(

@@ -51,7 +51,8 @@ int main(int argc, char **argv)
         } else if (path == NULL) {
             path = argv[index];
         } else {
-            fprintf(stderr, "vsfsck: only one image can be checked at a time\n");
+            fprintf(stderr,
+                    "vsfsck: only one image can be checked at a time\n");
             usage(stderr, program);
             return 2;
         }
