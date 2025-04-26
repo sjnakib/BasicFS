@@ -571,6 +571,30 @@ def test_repair_all_provided() -> None:
             )
 
 
+def test_repair_idempotent() -> None:
+    with tempfile.TemporaryDirectory() as directory:
+        target = Path(directory) / "set-01.img"
+        shutil.copy2(IMAGE_DIR / "set-01.img", target)
+
+        first = run("--fix", str(target))
+        before = hashlib.sha256(target.read_bytes()).hexdigest()
+        second = run("--fix", str(target))
+        after = hashlib.sha256(target.read_bytes()).hexdigest()
+
+        expect(
+            "second repair finds nothing",
+            first.returncode == 0
+            and second.returncode == 0
+            and "No repairs needed." in second.stdout,
+            second.stdout,
+        )
+        expect(
+            "second repair keeps the image bytes",
+            before == after,
+            "image changed on the second repair",
+        )
+
+
 def main() -> int:
     if not BINARY.exists():
         print(f"missing binary: {BINARY}", file=sys.stderr)
@@ -587,6 +611,7 @@ def main() -> int:
     test_pointer_repair()
     test_duplicate_repair()
     test_repair_all_provided()
+    test_repair_idempotent()
 
     print()
     if failures:
