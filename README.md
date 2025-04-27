@@ -125,7 +125,15 @@ The command prints the original findings, writes the repaired image, then runs t
 make test
 ```
 
-The suite runs the checker on all fourteen supplied images, repairs each one on a copy, and rechecks the result. It also generates clean, duplicate, bad-block, indirect, short, and trailing-byte fixtures in a temporary directory.
+The suite runs the checker on all fourteen supplied images, repairs each one on a copy, and rechecks the result. It also generates clean, duplicate, bad-block, indirect, short, and trailing-byte fixtures in a temporary directory. The current suite contains 149 checks.
+
+For a clean rebuild followed by the full suite:
+
+```bash
+make check
+```
+
+The C sources compile with `-Wall -Wextra -Wpedantic` and no warnings. The repair tests never modify the images under `tests/images/`.
 
 ## Documentation
 
