@@ -20,7 +20,12 @@ build:
 test: $(TARGET)
 	python3 tests/run_tests.py
 
+check:
+	$(MAKE) clean
+	$(MAKE) all
+	$(MAKE) test
+
 clean:
 	rm -rf build $(TARGET)
 
-.PHONY: all test clean
+.PHONY: all test check clean
