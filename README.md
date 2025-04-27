@@ -59,6 +59,66 @@ Exit codes:
 
 Use `./vsfsck --help` for the short command summary.
 
+## Repair
+
+Work on a copy. `--fix` changes the image in place.
+
+```bash
+cp tests/images/set-01.img /tmp/set-01.img
+./vsfsck --fix /tmp/set-01.img
+./vsfsck /tmp/set-01.img
+```
+
+Repair mode:
+
+- writes the expected superblock fields
+- rebuilds the inode bitmap from allocated inodes
+- rebuilds the data bitmap from referenced blocks
+- clears block pointers outside the data area
+- keeps the first reference to a duplicated block
+- updates each inode block count
+
+The command prints the original findings, writes the repaired image, then runs the check again. A clean second report gives exit code `0`.
+
+## Project structure
+
+```text
+.
+├── include/vsfs.h
+├── src/
+│   ├── main.c
+│   ├── image.c
+│   ├── superblock.c
+│   ├── bitmap.c
+│   ├── inode.c
+│   ├── check.c
+│   ├── report.c
+│   └── repair.c
+├── tests/
+│   ├── run_tests.py
+│   └── images/
+├── docs/
+│   ├── project-02.pdf
+│   ├── fs-blocks-structure.png
+│   ├── design.md
+│   └── test-sets.md
+├── Makefile
+└── README.md
+```
+
+## Tests
+
+```bash
+make test
+```
+
+The suite runs the checker on all fourteen supplied images, repairs each one on a copy, and rechecks the result. It also generates clean, duplicate, bad-block, indirect, short, and trailing-byte fixtures in a temporary directory.
+
+## Documentation
+
+- [Design notes](docs/design.md)
+- [Test image summary](docs/test-sets.md)
+
 ## Author
 
 Shafaat Jamil
