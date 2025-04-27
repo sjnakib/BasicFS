@@ -2,6 +2,11 @@
 
 A small consistency checker for the VSFS disk image format used in CSE321 Project 2.
 
+[![Stars](https://img.shields.io/github/stars/sjnakib/BasicFS?style=for-the-badge&logo=github&color=yellow)](https://github.com/sjnakib/BasicFS/stargazers)
+![Forks](https://img.shields.io/github/forks/sjnakib/BasicFS?style=for-the-badge&logo=github)
+![Last commit](https://img.shields.io/github/last-commit/sjnakib/BasicFS?style=for-the-badge&color=green)
+![Top language](https://img.shields.io/github/languages/top/sjnakib/BasicFS?style=for-the-badge)
+
 ## About
 
 VSFS is a teaching file system with a 256 KB image, 4 KB blocks, 80 inodes, and two bitmaps. This project reads such an image and reports where the superblock, the inode table, and the bitmaps disagree.
@@ -13,6 +18,14 @@ VSFS is a teaching file system with a 256 KB image, 4 KB blocks, 80 inodes, and 
 - Data bitmap entries
 - Duplicate block references
 - Block numbers outside the data area
+
+## Tech stack
+
+![C](https://img.shields.io/badge/C-00599C?style=for-the-badge&logo=c&logoColor=white)
+![GNU Make](https://img.shields.io/badge/GNU_Make-064F8C?style=for-the-badge&logo=gnu&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![Git](https://img.shields.io/badge/Git-F05032?style=for-the-badge&logo=git&logoColor=white)
+![Linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)
 
 ## Build
 
@@ -122,3 +135,7 @@ The suite runs the checker on all fourteen supplied images, repairs each one on 
 ## Author
 
 Shafaat Jamil
+
+## License
+
+This was a course project for CSE321. No license file is included.
